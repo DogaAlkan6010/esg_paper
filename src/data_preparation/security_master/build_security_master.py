@@ -470,7 +470,7 @@ def compute_primary_permno(time_master):
     return time_master, primary_map
 
 def build_security_master():
-    """Main function to build security master"""
+    """Main function to build security xmaster"""
     print("\n" + "="*60)
     print("CRSP/COMPUSTAT SECURITY MASTER BUILD - OPTIMIZED")
     print("="*60)

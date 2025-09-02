@@ -1,248 +1,110 @@
-# ESG Paper Data Processing Pipeline
+# ESG Data Processing Pipeline
 
-This repository contains a modular, extensible pipeline for processing ESG (Environmental, Social, Governance) data from multiple providers and linking it to financial databases via GVKEY identifiers.
+Automatically links ESG ratings from different providers to financial databases. Because every ESG provider decided to invent their own company identifiers, and someone has to deal with the mess.
 
-## 🏗️ Project Structure
+## The Problem
+
+ESG providers use their own identifiers, but your financial data uses different ones:
+- Refinitiv: "OrgPermID 4295905573"  
+- MSCI: "IssuerID APPLE_INC" 
+- Your CRSP data: "GVKEY 001690"
+
+## The Solution
+
+This pipeline creates mappings between provider identifiers and standard financial database keys (GVKEY, PERMNO) using CUSIP codes, ISINs, and ticker symbols as bridges. It handles the matching logic, quality scoring, and deduplication so you don't have to.
+
+## Project Structure
 
 ```
 esg_paper/
-├── README.md                    # This file
-├── requirements.txt             # Python dependencies
-├── data/                       # Data directories (created automatically)
+├── data/
 │   ├── raw/
-│   │   └── esg_ratings/
-│   │       ├── refinitiv/
-│   │       └── msci/
+│   │   ├── esg_ratings/        # ESG provider files
+│   │   ├── crsp/              # Raw CRSP files (optional)
+│   │   └── reference_data/    # S&P 500 constituents, etc.
 │   └── processed/
-│       ├── security_master/
-│       └── id_mappings/
-└── src/                        # Source code
-    └── data_preparation/
-        ├── README.md           # Detailed module documentation
-        ├── run_mappers.py      # Main orchestration script
-        ├── example_usage.py    # Usage examples
-        └── esg_mappers/        # Mapper implementations
-            ├── __init__.py
-            ├── base_mapper.py          # Abstract base class
-            ├── refinitiv_mapper.py     # Refinitiv implementation
-            └── msci_mapper.py          # MSCI implementation
+│       ├── security_master/   # CRSP-Compustat linking table
+│       └── id_mappings/       # Output mapping files
+└── src/
+    ├── data_collection/       # Scripts for downloading data
+    └── data_preparation/      # Main ESG mapping pipeline
+        ├── run_mappers.py     # Orchestrates all providers
+        ├── esg_mappers/       # Provider-specific logic
+        └── security_master/   # Builds linking table from CRSP
 ```
 
-## 🚀 Quick Start
+## How It Works
 
-### 1. Install Dependencies
+The pipeline uses a base class that handles common matching logic, with provider-specific implementations for data loading and identifier extraction. Each provider mapper:
+
+1. **Loads and cleans** provider data (handles different file formats, encodings)
+2. **Extracts identifiers** (CUSIP, ISIN, ticker) using provider-specific logic
+3. **Matches to security master** using hierarchical matching (CUSIP > ISIN > ticker)
+4. **Scores matches** based on overlap duration, security type, exchange quality
+5. **Selects best match** per company using aggregated scores
+
+The security master can be auto-built from raw CRSP files or provided pre-built.
+
+## Supported Providers
+
+- **Refinitiv** (CSV) - OrgPermID → GVKEY via CUSIP/ISIN matching
+- **MSCI** (Excel) - IssuerID → GVKEY via CUSIP/ISIN matching  
+- **FMP** (Parquet) - Symbol → GVKEY via ticker/ISIN matching
+
+## Output Files
+
+For each provider:
+- **`*_year_match.csv`** - Detailed yearly matches with quality scores
+- **`*_to_gvkey.csv`** - Entity-level crosswalk (best GVKEY per company)
+- **`consolidated_esg_to_gvkey.csv`** - Combined mapping across all providers
+
+## Matching Algorithm
+
+Uses hierarchical matching with quality scoring:
+1. **CUSIP6 matching** (most reliable)
+2. **ISIN matching** (extracts CUSIP6 for North American securities)  
+3. **Ticker matching** (fallback, least reliable)
+
+Match scores consider identifier type, security characteristics (common vs preferred), exchange quality (NYSE/NASDAQ preferred), and temporal overlap duration.
+
+## Quick Start
 
 ```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Check data setup
+python check_data_files.py
+
+# Run pipeline
+cd src/data_preparation && python run_mappers.py
 ```
 
-### 2. Prepare Your Data
+## Data Collection
 
-- Place your security master file at: `data/processed/security_master/security_master_segments.csv`
-- Place ESG data files:
-  - Refinitiv: `data/raw/esg_ratings/refinitiv/Refinitiv_Wharton_FULL_DB.csv`
-  - MSCI: Excel files in `data/raw/esg_ratings/msci/`
+The `src/data_collection/` directory contains scripts for downloading reference data:
 
-### 3. Run the Pipeline
+- **S&P 500 Historical Constituents** (`refinitiv_utils/spx_historical_constituents.py`)
+  - Downloads monthly S&P 500 membership with identifiers
+  - Must be copied and run inside Refinitiv Workspace CodeBook
+  - Output stored in `data/raw/reference_data/spx_historical_constituents_with_identifiers.xlsx`
+  - Useful for analyzing ESG coverage of large-cap universe
 
-```bash
-cd src/data_preparation
-python run_mappers.py
-```
+## Adding Providers
 
-## 🎯 Key Features
+Extend `BaseESGMapper` and implement:
+- `load_provider_data()` - Handle provider file format
+- `extract_identifiers()` - Extract CUSIP/ISIN/ticker
+- `perform_matching()` - Usually just calls base class methods
 
-### ✅ **Modular & Extensible**
-- Abstract base class handles common functionality
-- Easy to add new ESG data providers
-- DRY (Don't Repeat Yourself) architecture
+Register in `run_mappers.py` MAPPER_REGISTRY.
 
-### ✅ **Robust Matching Logic**
-- Multi-step identifier matching (CUSIP6, ISIN, Ticker)
-- Quality scoring system for match prioritization
-- Handles various data formats and encodings
+## Requirements
 
-### ✅ **Production Ready**
-- Comprehensive error handling
-- Progress tracking with timestamps
-- Detailed logging and output files
-
-### ✅ **Multiple Output Formats**
-- Yearly match details
-- Entity-level crosswalks
-- Consolidated cross-provider mapping
-
-## 📊 Supported Providers
-
-| Provider | Identifier | Input Format | Status |
-|----------|------------|--------------|--------|
-| **Refinitiv** | OrgPermID | CSV | ✅ Implemented |
-| **MSCI** | IssuerID | Excel | ✅ Implemented |
-| Sustainalytics | Entity ID | CSV | 🔄 Future |
-| S&P Global | Entity ID | CSV | 🔄 Future |
-
-## 🛠️ Usage Examples
-
-### Individual Mapper Usage
-
-```python
-from esg_mappers.refinitiv_mapper import RefinitivMapper
-
-# Initialize mapper
-mapper = RefinitivMapper(
-    security_master_path="path/to/security_master.csv",
-    output_dir="./processed/id_mappings"
-)
-
-# Run mapping
-matches, crosswalk = mapper.run("path/to/refinitiv_data.csv")
-
-print(f"Matched {len(matches):,} entity-year pairs")
-print(f"Mapped {len(crosswalk):,} unique entities")
-```
-
-### Batch Processing
-
-```python
-cd src/data_preparation
-python run_mappers.py  # Processes all enabled providers
-```
-
-### Analysis & Results
-
-```python
-python example_usage.py  # Runs examples and shows analysis
-```
-
-## 📈 Output Files
-
-The pipeline generates three types of output files:
-
-### 1. **Yearly Matches** (`{provider}_{entity_id}_year_match.csv`)
-Detailed year-by-year matching results with:
-- Match source (CUSIP6, ISIN, Ticker)
-- Quality scores and overlap calculations
-- Security characteristics and exchange information
-
-### 2. **Entity Crosswalk** (`{provider}_{entity_id}_to_gvkey.csv`)
-One record per entity with:
-- Best GVKEY mapping based on aggregated scores
-- Coverage statistics (years covered, first/last seen)
-- Primary PERMNO assignments
-
-### 3. **Consolidated Mapping** (`consolidated_esg_to_gvkey.csv`)
-Combined mapping across all providers for cross-provider analysis.
-
-## 🔧 Adding New Providers
-
-Adding a new ESG data provider is straightforward:
-
-1. **Create a new mapper class**:
-```python
-from esg_mappers.base_mapper import BaseESGMapper
-
-class NewProviderMapper(BaseESGMapper):
-    def __init__(self, ...):
-        super().__init__(...)
-        self.provider_name = "new_provider"
-        self.entity_id_col = "entity_id"
-    
-    def load_provider_data(self, data_path: str) -> pd.DataFrame:
-        # Load and clean your data
-        pass
-    
-    def extract_identifiers(self, df: pd.DataFrame) -> pd.DataFrame:
-        # Extract CUSIP6, ISIN, ticker symbols
-        pass
-    
-    def perform_matching(self, provider_data, security_master) -> pd.DataFrame:
-        # Use inherited methods like match_by_cusip6()
-        pass
-```
-
-2. **Register the mapper**:
-```python
-# In run_mappers.py
-MAPPER_REGISTRY["new_provider"] = NewProviderMapper
-
-DATA_SOURCES["new_provider"] = {
-    "path": "./data/raw/esg_ratings/new_provider/",
-    "enabled": True
-}
-```
-
-## 🧪 Testing
-
-The pipeline includes example usage scripts that demonstrate functionality:
-
-```bash
-cd src/data_preparation
-python example_usage.py
-```
-
-## 📋 Requirements
-
-- **Python**: 3.8+
-- **Core Libraries**: pandas, numpy
-- **Excel Support**: python-calamine, openpyxl
-- **Memory**: Varies by dataset size (typically 1-4GB RAM)
-
-## 🗂️ Data Setup
-
-The pipeline requires several data files. You have **two options** for the security master:
-
-### **Option 1: Auto-build from Raw CRSP (Recommended)**
-Place your raw CRSP files here - the pipeline will build the security master automatically:
-```
-data/raw/crsp/CRSP_STOCK_EVENTS_HIST_DESC_INF_FULL_DB.csv
-data/raw/crsp/CRSP_COMPUSTAT_LINKING_TABLE_FULL_DATABASE.csv
-```
-
-### **Option 2: Use Pre-built Security Master**
-If you already have a security master file:
-```
-data/processed/security_master/security_master_segments.csv
-```
-
-### **ESG Data Files (Required)**
-```
-data/raw/esg_ratings/refinitiv/Refinitiv_Wharton_FULL_DB.csv
-data/raw/esg_ratings/msci/*.xlsx
-```
-
-**📖 For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md)**
-
-**✅ Check your setup:**
-```bash
-python3 check_data_files.py
-```
-
-## 🤝 Contributing
-
-The modular design makes it easy to contribute:
-
-1. **New Providers**: Follow the template in the "Adding New Providers" section
-2. **Base Functionality**: Enhance the `BaseESGMapper` class for shared improvements
-3. **Output Formats**: Add new analysis functions to the main runner script
-
-## 📄 Data Requirements
-
-### Security Master File
-- Columns: `permno`, `gvkey`, `namedt`, `nameendt`, `ncusip6`, `ticker`, etc.
-- Format: CSV with CRSP-Compustat linking data
-
-### ESG Provider Data
-- **Refinitiv**: CSV with `orgpermid`, `year`, `cusip`, `isin`, `ticker`, `comname`
-- **MSCI**: Excel files with `ISSUERID`, `YEAR`, `ISSUER_CUSIP`, `ISSUER_ISIN`, etc.
-
-## 🎯 Design Principles
-
-1. **Separation of Concerns**: Each mapper handles only its provider's specifics
-2. **Reusability**: Common logic is shared via inheritance
-3. **Extensibility**: New providers require minimal code changes
-4. **Robustness**: Comprehensive error handling and data validation
-5. **Transparency**: Detailed progress reporting and match quality scoring
+- Python 3.8+, pandas, numpy, openpyxl, python-calamine
+- 1-4GB RAM depending on data size
+- See [SETUP_GUIDE.md](SETUP_GUIDE.md) for file locations and formats
 
 ---
 
-*Built for academic research with a focus on modularity, reproducibility, and extensibility.*
+*Academic research tool. Makes ESG identifier matching less painful.*

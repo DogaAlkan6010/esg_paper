@@ -19,5 +19,6 @@ Usage:
 from .base_mapper import BaseESGMapper
 from .refinitiv_mapper import RefinitivMapper
 from .msci_mapper import MSCIMapper
+from .fmp_mapper import FMPMapper
 
-__all__ = ["BaseESGMapper", "RefinitivMapper", "MSCIMapper"]
+__all__ = ["BaseESGMapper", "RefinitivMapper", "MSCIMapper", "FMPMapper"]

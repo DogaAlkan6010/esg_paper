@@ -104,6 +104,23 @@ def main():
             print("             Expected files like: ESG Ratings Timeseries*.xlsx")
             all_required_good = False
     
+    # FMP Data
+    fmp_exists = check_file_exists(
+        "data/raw/esg_ratings/fmp/fmp_esg_panel.parquet",
+        "FMP ESG Data (Parquet)",
+        required=False
+    )
+    
+    # Reference Data
+    print("📁 REFERENCE DATA")
+    print("-" * 50)
+    
+    spx_exists = check_file_exists(
+        "data/raw/reference_data/spx_historical_constituents_with_identifiers.xlsx",
+        "S&P 500 Historical Constituents",
+        required=False
+    )
+    
     # Summary
     print("=" * 70)
     if all_required_good:
@@ -130,6 +147,7 @@ def main():
         print("   Plus ESG data files:")
         print("     data/raw/esg_ratings/refinitiv/Refinitiv_Wharton_FULL_DB.csv")
         print("     data/raw/esg_ratings/msci/*.xlsx files")
+        print("     data/raw/esg_ratings/fmp/fmp_esg_panel.parquet (optional)")
     
     return 0 if all_required_good else 1
 

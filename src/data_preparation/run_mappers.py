@@ -15,9 +15,9 @@ sys.path.append(str(Path(__file__).parent.parent))
 from esg_mappers.base_mapper import BaseESGMapper
 from esg_mappers.refinitiv_mapper import RefinitivMapper
 from esg_mappers.msci_mapper import MSCIMapper
+from esg_mappers.fmp_mapper import FMPMapper
 # from esg_mappers.sustainalytics_mapper import SustAnalyticsMapper  # Future
 # from esg_mappers.sp_mapper import SPMapper  # Future
-# from esg_mappers.fmp_mapper import FMPMapper  # Future
 
 # -------------------------
 # MAPPER REGISTRY
@@ -26,6 +26,7 @@ from esg_mappers.msci_mapper import MSCIMapper
 MAPPER_REGISTRY: Dict[str, Type[BaseESGMapper]] = {
     "refinitiv": RefinitivMapper,
     "msci": MSCIMapper,
+    "fmp": FMPMapper,
     # "sustainalytics": SustAnalyticsMapper,  # Uncomment when implemented
     # "sp_global": SPMapper,  # Uncomment when implemented
 }
@@ -46,6 +47,10 @@ def get_data_sources():
         },
         "msci": {
             "path": str(project_root / "data/raw/esg_ratings/msci/"),  # Directory of Excel files
+            "enabled": True
+        },
+        "fmp": {
+            "path": str(project_root / "data/raw/esg_ratings/fmp/fmp_esg_panel.parquet"),  # Parquet file
             "enabled": True
         },
         # "sustainalytics": {
