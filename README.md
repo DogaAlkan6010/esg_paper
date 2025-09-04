@@ -24,8 +24,10 @@ esg_paper/
 │   │   └── reference_data/    # S&P 500 constituents, etc.
 │   └── processed/
 │       ├── security_master/   # CRSP-Compustat linking table
-│       └── id_mappings/       # Output mapping files
+│       ├── id_mappings/       # Output mapping files
+│       └── ml_analysis/       # ML dataset outputs
 └── src/
+    ├── analysis/              # ML dataset building and analysis
     ├── data_collection/       # Scripts for downloading data
     └── data_preparation/      # Main ESG mapping pipeline
         ├── run_mappers.py     # Orchestrates all providers
@@ -98,6 +100,25 @@ Extend `BaseESGMapper` and implement:
 - `perform_matching()` - Usually just calls base class methods
 
 Register in `run_mappers.py` MAPPER_REGISTRY.
+
+## Analysis Module
+
+The `src/analysis/` module contains scripts for building ML datasets from the mapped ESG data:
+
+### ML Skeleton Builder
+```bash
+cd src/analysis
+python3 build_ml_skeleton.py
+```
+
+Creates a forward-looking ML dataset using S&P 500 historical constituents:
+- Maps S&P 500 constituents to GVKEYs for consistent firm identification
+- Creates prediction rows where features come from year Y, targets from year Y+1
+- Adds placeholder columns for ESG disagreement, financial, and market features
+- Outputs ML-ready skeleton for ESG disagreement prediction models
+
+**Input:** S&P 500 constituents + security master  
+**Output:** `data/processed/ml_analysis/ml_grid_skeleton.csv`
 
 ## Requirements
 
